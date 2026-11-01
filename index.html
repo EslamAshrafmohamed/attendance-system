@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>نظام إدارة الحضور والغياب - إدارة النجيلة</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <style>
+    /* (نفس أنماطك الموجودة في الملف الأصلي) */
+    :root { --primary: #2E7D32; --primary-dark: #1B5E20; --light:#f8f9fa; --border:#dee2e6 }
+    body{font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg,#667eea,#764ba2); padding:20px; color:#333}
+    .container{max-width:1400px;margin:0 auto;background:white;border-radius:20px;overflow:hidden}
+    .header{background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;padding:30px;text-align:center}
+    .tabs{display:flex; background:var(--light); padding:10px}
+    .tab{padding:12px 18px; cursor:pointer; border:none; background:transparent; font-weight:700; margin:4px}
+    .tab.active{background:#fff;color:var(--primary)}
+    .tab-content{display:none;padding:25px}
+    .tab-content.active{display:block}
+    .form-group{margin-bottom:16px}
+    input,select,textarea{padding:10px;border:1px solid var(--border);border-radius:8px;width:100%}
+    .btn{background:var(--primary); color:#fff; padding:10px 16px;border-radius:8px;border:none;cursor:pointer;margin:6px}
+    .btn-outline{background:transparent;border:1px solid var(--primary);color:var(--primary)}
+    .attendance-table{width:100%;border-collapse:collapse;margin-top:16px}
+    .attendance-table th, .attendance-table td{padding:10px;border:1px solid #eee;text-align:center}
+    .summary-card{background:#E3F2FD;padding:16px;border-radius:12px;margin:12px 0}
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    @media(max-width:768px){ .grid-2{grid-template-columns:1fr} }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1><i class="fas fa-graduation-cap"></i> نظام إدارة الحضور والغياب</h1>
+      <p>نظام متكامل لإدارة حضور الطلاب وإعداد التقارير الإحصائية للمدارس</p>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="showTab('entry')"><i class="fas fa-edit"></i> تسجيل الحضور</button>
+      <button class="tab" onclick="showTab('reports')"><i class="fas fa-chart-bar"></i> التقارير</button>
+      <button class="tab" onclick="showTab('stats')"><i class="fas fa-chart-pie"></i> الإحصائيات</button>
+      <button class="tab" onclick="showTab('schools')"><i class="fas fa-school"></i> إدارة المدارس</button>
+    </div>
+
+    <!-- تسجيل -->
+    <div id="entry-tab" class="tab-content active">
+      <h2>تسجيل الحضور اليومي</h2>
+      <div style="text-align:center;margin-bottom:10px">
+        <button class="btn" onclick="verifyConnection()"><i class="fas fa-plug"></i> التحقق من الاتصال</button>
+        <button class="btn btn-outline" onclick="createSampleData()"><i class="fas fa-magic"></i> بيانات تجريبية</button>
+        <button class="btn btn-outline" onclick="checkAndFixData()"><i class="fas fa-search"></i> التحقق من البيانات</button>
+      </div>
+
+      <div class="summary-card">
+        <div class="grid-2">
+          <div>
+            <label>التاريخ</label>
+            <input type="date" id="date" readonly/>
+          </div>
+          <div>
+            <label>المرحلة التعليمية</label>
+            <select id="educationStage" onchange="loadSchoolsByStage()">
+              <option value="">-- اختر المرحلة --</option>
+              <option value="رياض اطفال">رياض أطفال</option>
+              <option value="ابتدائى">ابتدائي</option>
+              <option value="اعدادى">إعدادي</option>
+              <option value="ثانوى">ثانوي</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="margin-top:12px">
+          <label>اسم المدرسة</label>
+          <select id="school" onchange="resetVerification();">
+            <option value="">-- اختر المدرسة --</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="verification-section" class="summary-card" style="display:none">
+        <label>الرقم المسلسل للمدرسة</label>
+        <div style="display:flex;gap:8px">
+          <input id="schoolSerial" placeholder="أدخل الرقم المسلسل"/>
+          <button class="btn" onclick="verifySchoolSerial()">تحقق</button>
+        </div>
+        <div id="verification-result" style="margin-top:8px"></div>
+      </div>
+
+      <div id="attendance-section" style="display:none">
+        <div class="summary-card">
+          <p id="verified-school-info" style="font-weight:bold"></p>
+        </div>
+
+        <table class="attendance-table">
+          <thead>
+            <tr><th>الصف الدراسي</th><th>عدد المقيدين</th><th>عدد الحاضرين</th><th>عدد الغائبين</th><th>نسبة الحضور</th></tr>
+          </thead>
+          <tbody id="attendance-body">
+            <!-- سيتم توليد الصفوف ديناميكياً -->
+          </tbody>
+        </table>
+
+        <div style="text-align:center;margin-top:12px">
+          <button class="btn" onclick="saveAttendance()"><i class="fas fa-save"></i> حفظ البيانات</button>
+          <button class="btn btn-outline" onclick="resetForm()"><i class="fas fa-redo"></i> بدء تسجيل جديد</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- تقارير -->
+    <div id="reports-tab" class="tab-content">
+      <h2>التقارير</h2>
+      <div class="grid-2">
+        <div>
+          <label>من تاريخ</label>
+          <input type="date" id="startDate"/>
+        </div>
+        <div>
+          <label>إلى تاريخ</label>
+          <input type="date" id="endDate"/>
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        <label>تصفية بالمدرسة</label>
+        <select id="reportSchool"><option value="">جميع المدارس</option></select>
+      </div>
+      <div style="text-align:center;margin-top:12px">
+        <button class="btn" onclick="generateDetailedReportUI()">إنشاء التقرير</button>
+        <button class="btn btn-outline" onclick="exportDetailedReportUI()">تصدير لإكسل</button>
+      </div>
+      <div id="report-result" style="margin-top:12px"></div>
+    </div>
+
+    <!-- إحصائيات -->
+    <div id="stats-tab" class="tab-content">
+      <h2>الإحصائيات العامة</h2>
+      <div style="margin-top:8px">
+        <button class="btn" onclick="loadStatistics()">تحديث الإحصائيات</button>
+      </div>
+      <div class="grid-2" style="margin-top:12px">
+        <div class="card summary-card">
+          <div>إجمالي المقيدين</div>
+          <div id="total-enrolled">0</div>
+        </div>
+        <div class="card summary-card">
+          <div>إجمالي الحاضرين</div>
+          <div id="total-present">0</div>
+        </div>
+      </div>
+      <div id="statistics-result" style="margin-top:12px"></div>
+    </div>
+
+    <!-- إدارة المدارس -->
+    <div id="schools-tab" class="tab-content">
+      <h2>إدارة المدارس</h2>
+      <div class="grid-2">
+        <div>
+          <label>كود المدرسة</label>
+          <input id="newSchoolCode" placeholder="مثال PRM003"/>
+          <label>اسم المدرسة</label>
+          <input id="newSchoolName" placeholder="أدخل اسم المدرسة"/>
+          <label>المرحلة</label>
+          <select id="newSchoolStage">
+            <option value="رياض اطفال">رياض أطفال</option>
+            <option value="ابتدائى">ابتدائي</option>
+            <option value="اعدادى">إعدادي</option>
+            <option value="ثانوى">ثانوي</option>
+          </select>
+          <label>الرقم المسلسل</label>
+          <input id="newSchoolSerial" placeholder="الرقم المسلسل"/>
+          <div style="margin-top:8px">
+            <button class="btn" onclick="addNewSchoolUI()">إضافة المدرسة</button>
+          </div>
+        </div>
+        <div>
+          <div style="margin-bottom:8px">
+            <button class="btn btn-outline" onclick="loadSchoolsList()">تحديث القائمة</button>
+            <button class="btn btn-outline" onclick="createSampleData()">بيانات تجريبية</button>
+            <button class="btn btn-outline" onclick="clearAllData()">مسح البيانات</button>
+          </div>
+          <div id="schools-list"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="loading-overlay" style="display:none;position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(255,255,255,0.7);align-items:center;justify-content:center">
+    <div style="text-align:center;padding:20px">
+      <div style="width:48px;height:48px;border-radius:50%;border:6px solid #eee;border-top-color:#2E7D32;animation:spin 1s linear infinite;margin:0 auto"></div>
+      <p id="loading-message">جاري المعالجة...</p>
+    </div>
+  </div>
+
+  <script>
+    // ================== إعداد الاتصال ==================
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx_9ydj6yIC6XlCa08Kj7Vpki76brLdtDSCZTaYlwvmQgk_WBlSIwqw1mILYvJ1sbS3/exec';
+    const API_KEY = ''; // أدخل المفتاح هنا إذا ضبطته في Code.gs
+
+    // وظائف مساعدة للعرض
+    function showLoading(msg) {
+      const o = document.getElementById('loading-overlay');
+      if (o) { document.getElementById('loading-message').textContent = msg || 'جاري المعالجة...'; o.style.display = 'flex'; }
+    }
+    function hideLoading(){ const o=document.getElementById('loading-overlay'); if(o) o.style.display='none'; }
+    function showAlert(msg,type){ alert(msg); } // يمكنك استبدالها بمودال أجمل في مشروعك
+
+    // تبويبات
+    function showTab(name){
+      document.querySelectorAll('.tab').forEach(btn=>btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(div=>div.classList.remove('active'));
+      document.querySelector(`.tab[onclick="showTab('${name}')"]`)?.classList.add('active');
+      document.getElementById(name + '-tab')?.classList.add('active');
+    }
+
+    // تهيئة الواجهة عند التحميل
+    document.addEventListener('DOMContentLoaded', function(){
+      setCurrentDate();
+      loadAllSchools();
+      setDefaultDates();
+    });
+
+    function setCurrentDate(){ document.getElementById('date').value = new Date().toISOString().split('T')[0]; }
+    function setDefaultDates(){
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('startDate').value = today;
+      document.getElementById('endDate').value = today;
+    }
+
+    // ========== استدعاءات الشبكة ==========
+    async function postAction(action, payload = {}) {
+      const body = Object.assign({}, payload, { action: action });
+      if (API_KEY) body.apiKey = API_KEY;
+      showLoading('جاري الاتصال بالخادم...');
+      try {
+        const res = await fetch(SCRIPT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const json = await res.json();
+        return json;
+      } catch (err) {
+        console.error('postAction error', err);
+        return { success: false, message: err.message || err.toString() };
+      } finally {
+        hideLoading();
+      }
+    }
+
+    // تحقق من الاتصال
+    async function verifyConnection(){
+      const r = await postAction('ping', {});
+      if (r && r.success) showAlert('✅ ' + r.message, 'success');
+      else showAlert('❌ ' + (r.message || JSON.stringify(r)), 'error');
+    }
+
+    // تحميل جميع المدارس (لتصفية التقارير)
+    async function loadAllSchools(){
+      const r = await postAction('getAllSchools', {});
+      if (r && r.success) {
+        const schools = r.data || [];
+        const reportSelect = document.getElementById('reportSchool');
+        const schoolSelect = document.getElementById('school');
+        reportSelect.innerHTML = '<option value="">جميع المدارس</option>';
+        schoolSelect.innerHTML = '<option value="">-- اختر المدرسة --</option>';
+        schools.forEach(s=>{
+          const opt = document.createElement('option'); opt.value = s.id; opt.textContent = s.code + ' - ' + s.name;
+          reportSelect.appendChild(opt);
+          const opt2 = opt.cloneNode(true);
+          opt2.setAttribute('data-serial', s.serial || '');
+          schoolSelect.appendChild(opt2);
+        });
+      } else {
+        console.warn('loadAllSchools failed', r);
+      }
+    }
+
+    // تحميل المدارس حسب المرحلة للواجهة
+    async function loadSchoolsByStage(){
+      const stage = document.getElementById('educationStage').value;
+      if (!stage) {
+        document.getElementById('school').innerHTML = '<option value="">-- اختر المدرسة --</option>';
+        document.getElementById('verification-section').style.display = 'none';
+        document.getElementById('attendance-section').style.display = 'none';
+        return;
+      }
+      const r = await postAction('getSchoolsByStage', { stage: stage });
+      if (r && r.success) {
+        const schoolSelect = document.getElementById('school');
+        schoolSelect.innerHTML = '<option value="">-- اختر المدرسة --</option>';
+        (r.data || []).forEach(s=>{
+          const option = document.createElement('option');
+          option.value = s.id;
+          option.textContent = s.code + ' - ' + s.name;
+          option.setAttribute('data-serial', s.serial || '');
+          schoolSelect.appendChild(option);
+        });
+        document.getElementById('verification-section').style.display = 'block';
+        document.getElementById('attendance-section').style.display = 'none';
+      } else {
+        showAlert('فشل في جلب المدارس: ' + (r.message || ''),'error');
+      }
+    }
+
+    function resetVerification(){
+      document.getElementById('verification-result').innerHTML = '';
+      document.getElementById('attendance-section').style.display = 'none';
+      document.getElementById('verification-section').style.display = document.getElementById('educationStage').value ? 'block' : 'none';
+    }
+
+    // التحقق من الرقم المسلسل
+    async function verifySchoolSerial(){
+      const schoolId = document.getElementById('school').value;
+      const serial = document.getElementById('schoolSerial').value;
+      if (!schoolId) { showAlert('اختر المدرسة أولاً','error'); return; }
+      if (!serial) { showAlert('أدخل الرقم المسلسل','error'); return; }
+      const r = await postAction('verifySchoolSerial', { schoolId: schoolId, serialNumber: serial });
+      const el = document.getElementById('verification-result');
+      if (r && r.verified) {
+        el.innerHTML = '<div style="color:green">'+ r.message +'</div>';
+        document.getElementById('attendance-section').style.display = 'block';
+        document.getElementById('verified-school-info').textContent = r.schoolName + ' ('+ schoolId +')';
+        populateAttendanceTableWithDefaults();
+      } else {
+        el.innerHTML = '<div style="color:red">'+ (r.message || 'فشل التحقق') +'</div>';
+      }
+    }
+
+    // ملء جدول حضور افتراضي (يمكن تخصيصه لاحقاً)
+    function populateAttendanceTableWithDefaults(){
+      const tbody = document.getElementById('attendance-body');
+      tbody.innerHTML = '';
+      // أمثلة صفوف — عدل أو اربط بنموذج حقيقي لديكم
+      const defaultGrades = ['KG','1','2','3','4','5','6'];
+      defaultGrades.forEach(g=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="grade">${g}</td>
+          <td><input class="enrolled" type="number" min="0" value="0" style="width:100px"></td>
+          <td><input class="present" type="number" min="0" value="0" style="width:100px"></td>
+          <td class="absent">0</td>
+          <td class="rate">0%</td>
+        `;
+        // حدث الحساب عند تغيير الأرقام
+        tr.querySelector('.enrolled').addEventListener('input', updateRowCalculations);
+        tr.querySelector('.present').addEventListener('input', updateRowCalculations);
+        tbody.appendChild(tr);
+      });
+    }
+
+    function updateRowCalculations(e){
+      const tr = e.target.closest('tr');
+      const enrolled = Number(tr.querySelector('.enrolled').value) || 0;
+      let present = Number(tr.querySelector('.present').value) || 0;
+      if (present > enrolled) present = enrolled;
+      tr.querySelector('.present').value = present;
+      const absent = enrolled - present;
+      const rate = enrolled > 0 ? ((present / enrolled) * 100).toFixed(2) + '%' : '0%';
+      tr.querySelector('.absent').textContent = absent;
+      tr.querySelector('.rate').textContent = rate;
+    }
+
+    // تجهيز صفوف للإرسال
+    function prepareAttendanceRowsFromDOM(){
+      const tbody = document.getElementById('attendance-body');
+      const rows = [];
+      tbody.querySelectorAll('tr').forEach(tr=>{
+        const grade = tr.querySelector('.grade') ? tr.querySelector('.grade').textContent.trim() : '';
+        const enrolled = Number(tr.querySelector('.enrolled') ? tr.querySelector('.enrolled').value : 0) || 0;
+        const present = Number(tr.querySelector('.present') ? tr.querySelector('.present').value : 0) || 0;
+        rows.push({ grade: grade, enrolled: enrolled, present: present });
+      });
+      return rows;
+    }
+
+    // حفظ الحضور إلى Google Sheets عبر Apps Script
+    async function saveAttendance(){
+      const rows = prepareAttendanceRowsFromDOM();
+      if (!rows || rows.length === 0) { showAlert('لا توجد بيانات للحفظ','error'); return; }
+      const date = document.getElementById('date').value;
+      const schoolId = document.getElementById('school').value;
+      const payload = { date: date, school_id: schoolId, attendance_data: rows };
+      const r = await postAction('saveAttendance', payload);
+      if (r && r.success) {
+        showAlert('✅ ' + r.message + ' (تم إضافة ' + (r.appended || 0) + ' سطر)', 'success');
+        loadStatistics();
+      } else {
+        showAlert('فشل الحفظ: ' + (r.message || ''),'error');
+      }
+    }
+
+    // تحميل الإحصائيات وعرضها
+    async function loadStatistics(){
+      const r = await postAction('getStatistics', {});
+      if (r) {
+        document.getElementById('total-enrolled').textContent = r.totalStudents || 0;
+        document.getElementById('total-present').textContent = r.totalPresent || 0;
+        const st = document.getElementById('statistics-result');
+        st.innerHTML = '<pre style="white-space:pre-wrap">'+ JSON.stringify(r, null, 2) + '</pre>';
+      }
+    }
+
+    // إنشاء بيانات تجريبية
+    async function createSampleData(){
+      const r = await postAction('createSampleData', {});
+      if (r && r.success) { showAlert(r.message,'success'); loadAllSchools(); }
+      else showAlert('فشل إنشاء البيانات: ' + (r.message || ''),'error');
+    }
+
+    // حذف البيانات
+    async function clearAllData(){
+      if (!confirm('هل أنت متأكد من مسح بيانات الحضور والملخّص؟')) return;
+      const r = await postAction('clearAllData', {});
+      if (r && r.success) { showAlert(r.message,'success'); loadStatistics(); }
+      else showAlert('فشل المسح: ' + (r.message || ''),'error');
+    }
+
+    // إضافة مدرسة من الواجهة
+    async function addNewSchoolUI(){
+      const code = document.getElementById('newSchoolCode').value.trim();
+      const name = document.getElementById('newSchoolName').value.trim();
+      const stage = document.getElementById('newSchoolStage').value;
+      const serial = document.getElementById('newSchoolSerial').value.trim();
+      if (!code || !name) { showAlert('أدخل كود واسم المدرسة','error'); return; }
+      const r = await postAction('addNewSchool', { schoolData: { code: code, name: name, stage: stage, serial: serial } });
+      if (r && r.success) { showAlert(r.message,'success'); loadAllSchools(); loadSchoolsList(); }
+      else showAlert('فشل الإضافة: ' + (r.message || ''),'error');
+    }
+
+    // تحميل قائمة المدارس في صفحة الإدارة
+    async function loadSchoolsList(){
+      const r = await postAction('getAllSchools', {});
+      const container = document.getElementById('schools-list');
+      if (r && r.success) {
+        const list = r.data || [];
+        container.innerHTML = '<ul>' + list.map(s=>`<li>${s.id} - ${s.code} - ${s.name} - ${s.type}</li>`).join('') + '</ul>';
+      } else {
+        container.innerHTML = 'لا توجد مدارس';
+      }
+    }
+
+    // توليد تقرير مفصل من الواجهة
+    async function generateDetailedReportUI(){
+      const startDate = document.getElementById('startDate').value;
+      const endDate = document.getElementById('endDate').value;
+      const schoolId = document.getElementById('reportSchool').value;
+      const r = await postAction('generateDetailedReport', { startDate: startDate, endDate: endDate, schoolId: schoolId });
+      const rr = document.getElementById('report-result');
+      if (r && r.success) {
+        rr.innerHTML = '<pre style="white-space:pre-wrap">'+ JSON.stringify(r.data, null, 2) +'</pre>';
+      } else {
+        rr.innerHTML = 'لا توجد بيانات أو حدث خطأ: ' + (r.message || '');
+      }
+    }
+
+    async function exportDetailedReportUI(){
+      const startDate = document.getElementById('startDate').value;
+      const endDate = document.getElementById('endDate').value;
+      const schoolId = document.getElementById('reportSchool').value;
+      const r = await postAction('exportDetailedReport', { startDate: startDate, endDate: endDate, schoolId: schoolId });
+      if (r && r.success) {
+        window.open(r.url, '_blank');
+      } else {
+        showAlert('خطأ في التصدير: ' + (r.message || ''),'error');
+      }
+    }
+
+    // فحص وإصلاح البيانات (يتصل بدالة checkAndFixData في الخادم إن رغبت بإنشائها)
+    async function checkAndFixData(){
+      // حالياً سنكتفي بإعادة تحميل المدارس والتحقق من وجود أوراق
+      await loadAllSchools();
+      await loadSchoolsList();
+      showAlert('تم التحقق وتحميل البيانات المحلية/الخادمية (إن وجدت).','success');
+    }
+
+    // إعادة تعيين النموذج
+    function resetForm(){
+      document.getElementById('attendance-body').innerHTML = '';
+      document.getElementById('attendance-section').style.display = 'none';
+      document.getElementById('verification-result').innerHTML = '';
+      setCurrentDate();
+    }
+  </script>
+</body>
+</html>
